@@ -62,7 +62,7 @@ module Views =
     let index () =
         [
             partial()
-            let KP_VERSION = "0.4.0"
+            let KP_VERSION = "0.5.0"
 
             div [ _class "post-content container"; _style "text-align: center;"] [
                 br []
@@ -147,7 +147,8 @@ let articleHandler (url: string) =
             let response = Http.Request(path,
                 headers = [
                     "User-Agent", "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)";
-                    "X-Forwarded-For", "66.249.66.1"
+                    "X-Forwarded-For", "66.249.66.1";
+                    "Referer", "google.com"
                 ]
             )
             let model   = { Text = ExtractValueFromBody response.Body }
@@ -161,9 +162,10 @@ let articleHandler (url: string) =
 
     
     match urlDecoded with
-    | Prefix "https://www.huffingtonpost.it/" rest -> getArticle urlDecoded
-    | Prefix "https://huffingtonpost.it/" rest -> getArticle urlDecoded
-    | _ -> displayError "URL must be huffingtonpost.it, my friend."
+    | Prefix "https://www.huffingtonpost.it/" rest | Prefix "https://huffingtonpost.it/" rest -> getArticle urlDecoded
+    | Prefix "https://repubblica.it/" rest | Prefix "https://www.repubblica.it/" rest -> getArticle urlDecoded
+    | Prefix "https://limesonline.com/" rest | Prefix "https://www.limesonline.com/" rest -> getArticle urlDecoded
+    | _ -> displayError "URL must be a supported website, my friend."
 
 let errorPageHandler (err: string) =
     let model = { Text = err }
