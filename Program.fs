@@ -10,6 +10,7 @@ open Microsoft.Extensions.Logging
 open Microsoft.Extensions.DependencyInjection
 open Giraffe
 open FSharp.Data
+open AngleSharp
 
 // ---------------------------------
 // Models
@@ -62,7 +63,7 @@ module Views =
     let index () =
         [
             partial()
-            let KP_VERSION = "0.5.0"
+            let KP_VERSION = "0.6.0"
 
             div [ _class "post-content container"; _style "text-align: center;"] [
                 br []
@@ -128,6 +129,23 @@ let displayError errorMessage =
     let view = Views.errorPage model
     htmlView view
 
+let getAMPUrl (path: string): string =
+    match path.EndsWith("/amp") with
+    | true -> path
+    | _ -> 
+        match path.EndsWith("/amp/") with
+        | true -> path
+        | _ ->
+            match path.EndsWith("/") with
+            | true -> path + "amp"
+            | _ -> path + "/amp"
+
+let getHTMLDoc (htmlContent: string) = 
+    let cfg = Configuration.Default.WithDefaultLoader()
+    let ctx = BrowsingContext.New(cfg)
+    async { return! ctx.OpenAsync(fun req -> req.Content(htmlContent) |> ignore) |> Async.AwaitTask } |> Async.RunSynchronously
+
+
 // ---------------------------------
 // Web app
 // ---------------------------------
@@ -142,7 +160,7 @@ let articleHandler (url: string) =
         |> System.Convert.FromBase64String
         |> System.Text.Encoding.ASCII.GetString
 
-    let getArticle path =
+    let getArticleWithGoogle path =
         try
             let response = Http.Request(path,
                 headers = [
@@ -160,11 +178,73 @@ let articleHandler (url: string) =
         | Failure ex ->
             displayError $"Caught an exception: {ex}"
 
+    let getArticleLaNazione path =
+        let config = Configuration.Default
+        let context = BrowsingContext.New(config)
+
+        let AMPUrl = getAMPUrl path
+
+        try
+            // let response_std = Http.Request(path) #TODO: get original page and substitute article from amp
+            let response_amp = Http.Request(AMPUrl)
+
+            // let html_std = ExtractValueFromBody response_std.Body #TODO: get original page and substitute article from amp
+            let html_amp = ExtractValueFromBody response_amp.Body
+
+            
+            // let document_std = getHTMLDoc html_std #TODO: get original page and substitute article from amp
+            let document_amp = getHTMLDoc html_amp
+
+            (document_amp.GetElementsByClassName("article-text")[0]).Remove()
+            (document_amp.GetElementsByClassName("article-text")[0]).SetAttribute("class", "article-text")
+            (document_amp.GetElementsByClassName("article-text")[0]).RemoveAttribute("itemprop") |> ignore
+            (document_amp.GetElementsByClassName("article-text")[0]).RemoveAttribute("amp-access") |> ignore
+            (document_amp.GetElementsByClassName("article-text")[0]).RemoveAttribute("amp-access-hide") |> ignore
+            document_amp.GetElementById("piano-modal-subscribe").Remove()
+            (document_amp.GetElementsByClassName("piano-modal")[0]).Remove()
+
+            for element in document_amp.GetElementsByClassName("mobile-navigation") do
+                element.Remove()
+
+            let model   = { Text = document_amp.DocumentElement.OuterHtml }
+            let view    = Views.article model
+            htmlView view
+        with
+        | :? System.Net.WebException as ex ->
+            displayError $"Something went wrong when loading the article: {ex.InnerException.Message}"
+        | Failure ex ->
+            displayError $"Caught an exception: {ex}"
+
+    let getArticleIlTirreno path =
+        let config = Configuration.Default
+        let context = BrowsingContext.New(config)
+
+        try
+            let response = Http.Request(path)
+
+            let html = ExtractValueFromBody response.Body
+        
+            let document = getHTMLDoc html
+
+            for element in document.GetElementsByTagName("script") do
+                element.Remove()
+
+            let model   = { Text = document.DocumentElement.OuterHtml }
+            let view    = Views.article model
+            htmlView view
+        with
+        | :? System.Net.WebException as ex ->
+            displayError $"Something went wrong when loading the article: {ex.InnerException.Message}"
+        | Failure ex ->
+            displayError $"Caught an exception: {ex}"
+
     
     match urlDecoded with
-    | Prefix "https://www.huffingtonpost.it/" rest | Prefix "https://huffingtonpost.it/" rest -> getArticle urlDecoded
-    | Prefix "https://repubblica.it/" rest | Prefix "https://www.repubblica.it/" rest -> getArticle urlDecoded
-    | Prefix "https://limesonline.com/" rest | Prefix "https://www.limesonline.com/" rest -> getArticle urlDecoded
+    | Prefix "https://www.huffingtonpost.it/" rest | Prefix "https://huffingtonpost.it/" rest -> getArticleWithGoogle urlDecoded
+    | Prefix "https://repubblica.it/" rest | Prefix "https://www.repubblica.it/" rest -> getArticleWithGoogle urlDecoded
+    | Prefix "https://limesonline.com/" rest | Prefix "https://www.limesonline.com/" rest -> getArticleWithGoogle urlDecoded
+    | Prefix "https://quotidiano.net/" rest | Prefix "https://www.quotidiano.net/" rest -> getArticleLaNazione urlDecoded
+    | Prefix "https://iltirreno.gelocal.it" rest -> getArticleIlTirreno urlDecoded
     | _ -> displayError "URL must be a supported website, my friend."
 
 let errorPageHandler (err: string) =
