@@ -11,6 +11,7 @@ open Microsoft.Extensions.DependencyInjection
 open Giraffe
 open FSharp.Data
 open AngleSharp
+open Nager.PublicSuffix
 
 // ---------------------------------
 // Models
@@ -63,7 +64,7 @@ module Views =
     let index () =
         [
             partial()
-            let KP_VERSION = "0.6.0"
+            let KP_VERSION = "0.6.1"
 
             div [ _class "post-content container"; _style "text-align: center;"] [
                 br []
@@ -123,6 +124,11 @@ let (|Prefix|_|) (p:string) (s:string) =
     match s.StartsWith(p) with
     | true -> Some(s.Substring(p.Length))
     | _ -> None
+
+let getDomain (url: string) =
+    let domainParser = new DomainParser(new WebTldRuleProvider())
+    let domainInfo = domainParser.Parse(url)
+    domainInfo.RegistrableDomain
 
 let displayError errorMessage =
     let model = { Text = errorMessage }
@@ -238,13 +244,14 @@ let articleHandler (url: string) =
         | Failure ex ->
             displayError $"Caught an exception: {ex}"
 
-    
-    match urlDecoded with
-    | Prefix "https://www.huffingtonpost.it/" rest | Prefix "https://huffingtonpost.it/" rest -> getArticleWithGoogle urlDecoded
-    | Prefix "https://repubblica.it/" rest | Prefix "https://www.repubblica.it/" rest -> getArticleWithGoogle urlDecoded
-    | Prefix "https://limesonline.com/" rest | Prefix "https://www.limesonline.com/" rest -> getArticleWithGoogle urlDecoded
-    | Prefix "https://quotidiano.net/" rest | Prefix "https://www.quotidiano.net/" rest -> getArticleLaNazione urlDecoded
-    | Prefix "https://iltirreno.gelocal.it" rest -> getArticleIlTirreno urlDecoded
+    let realDomain = getDomain urlDecoded
+
+    match realDomain with
+    | "huffingtonpost.it" -> getArticleWithGoogle urlDecoded
+    | "repubblica.it" -> getArticleWithGoogle urlDecoded
+    | "limesonline.com" -> getArticleWithGoogle urlDecoded
+    | "quotidiano.net" -> getArticleLaNazione urlDecoded
+    | "gelocal.it" -> getArticleIlTirreno urlDecoded
     | _ -> displayError "URL must be a supported website, my friend."
 
 let errorPageHandler (err: string) =
