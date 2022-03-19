@@ -24,6 +24,7 @@ let articleHandler (url: string) =
     | "limesonline.com" -> getArticleWithGoogle urlDecoded
     | "quotidiano.net" -> getArticleLaNazione urlDecoded
     | "gelocal.it" -> getArticleIlTirreno urlDecoded
+    | "editorialedomani.it" -> getArticleWithGoogle urlDecoded
     | _ -> displayError "URL must be a supported website, my friend."
 
 let errorPageHandler (err: string) =
