@@ -46,7 +46,7 @@ let partial () =
 let index () =
     [
         partial()
-        let KP_VERSION = "0.7.1"
+        let KP_VERSION = "0.7.2"
 
         div [ _class "post-content container"; _style "text-align: center;"] [
             br []
