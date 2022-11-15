@@ -15,7 +15,7 @@ let getArticleWithGoogle path =
             headers = [
                 "User-Agent", "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)";
                 "X-Forwarded-For", "66.249.66.1";
-                "Referer", "google.com"
+                "Referer", "https://www.google.com/"
             ],
             responseEncodingOverride = "utf-8"
         )
